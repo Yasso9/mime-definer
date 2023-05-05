@@ -43,20 +43,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       appBar: null,
       body: Center(
-        child: ListView(
-          padding: const EdgeInsets.all(8),
-          children: <Widget>[
-            for (final mimeType in defaultValues)
-              SizedBox(height: 50, child: Center(child: Text(mimeType))),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 20),
-              child: ProgramChooser(),
-            ),
-          ],
-        ),
+        child: ProgramChooser(),
       ),
     );
   }
@@ -71,8 +61,26 @@ Future<List<String>> listApplication() async {
   return output.split('\n');
 }
 
+void readDesktopFile(File file) async {
+  List<String> lines = await file.readAsLines();
+
+  Map<String, String> desktopEntries = {};
+
+  for (var line in lines) {
+    if (!line.startsWith('[') && !line.startsWith('#') && line.contains('=')) {
+      var index = line.indexOf('=');
+      var key = line.substring(0, index);
+      var value = line.substring(index + 1);
+      desktopEntries[key] = value;
+    }
+  }
+
+  print(desktopEntries);
+}
+
 class ProgramChooser extends StatefulWidget {
   const ProgramChooser({super.key});
+
   @override
   State<ProgramChooser> createState() => _ProgramChooserState();
 }
@@ -80,6 +88,8 @@ class ProgramChooser extends StatefulWidget {
 class _ProgramChooserState extends State<ProgramChooser> {
   List<String>? applicationList;
   String? selected;
+
+  Map<String, String> appDesktopInfo = {};
 
   @override
   void initState() {
@@ -89,22 +99,40 @@ class _ProgramChooserState extends State<ProgramChooser> {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButton<String>(
-      value: selected,
-      icon: const Icon(Icons.arrow_downward),
-      items: <DropdownMenuItem<String>>[
-        if (applicationList != null)
-          for (final application in applicationList!)
-            DropdownMenuItem<String>(
-              value: application,
-              child: Text(application),
-            )
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        DropdownButton<String>(
+          value: selected,
+          icon: const Icon(Icons.arrow_downward),
+          iconSize: 24,
+          elevation: 16,
+          style: const TextStyle(color: Colors.deepPurple),
+          underline: Container(
+            height: 2,
+            color: Colors.deepPurpleAccent,
+          ),
+          onChanged: (String? value) {
+            setState(() {
+              selected = value;
+              // Print selected
+              readDesktopFile(File("/usr/share/applications/$selected"));
+            });
+          },
+          items: <DropdownMenuItem<String>>[
+            if (applicationList != null)
+              for (final application in applicationList!)
+                DropdownMenuItem<String>(
+                  value: application,
+                  child: Text(application),
+                )
+          ],
+        ),
+        // Show appDesktopInfo line by line
+        if (appDesktopInfo.isNotEmpty)
+          for (final entry in appDesktopInfo.entries)
+            Text('${entry.key}: ${entry.value}'),
       ],
-      onChanged: (String? value) {
-        setState(() {
-          selected = value;
-        });
-      },
     );
   }
 
@@ -115,6 +143,23 @@ class _ProgramChooserState extends State<ProgramChooser> {
       applicationList = data;
       selected = applicationList?.first;
     });
+  }
+
+  void readDesktopFile(File file) async {
+    List<String> lines = await file.readAsLines();
+
+    appDesktopInfo.clear();
+
+    for (var line in lines) {
+      if (!line.startsWith('[') &&
+          !line.startsWith('#') &&
+          line.contains('=')) {
+        var index = line.indexOf('=');
+        var key = line.substring(0, index);
+        var value = line.substring(index + 1);
+        appDesktopInfo[key] = value;
+      }
+    }
   }
 }
 
